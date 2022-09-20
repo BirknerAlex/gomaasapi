@@ -47,6 +47,9 @@ type Controller interface {
 	// Machines returns a list of machines that match the params.
 	Machines(MachinesArgs) ([]Machine, error)
 
+	// CreateMachine creates and returns a new Machine.
+	CreateMachine(args CreateMachineArgs) (Machine, error)
+
 	// AllocateMachine will attempt to allocate a machine to the user.
 	// If successful, the allocated machine is returned.
 	AllocateMachine(AllocateMachineArgs) (Machine, ConstraintMatches, error)

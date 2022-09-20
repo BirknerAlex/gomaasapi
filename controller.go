@@ -41,9 +41,10 @@ var (
 // ControllerArgs is an argument struct for passing the required parameters
 // to the NewController method.
 type ControllerArgs struct {
-	BaseURL    string
-	APIKey     string
-	HTTPClient *http.Client
+	BaseURL           string
+	APIKey            string
+	HTTPClient        *http.Client
+	additionalHeaders map[string]string
 }
 
 // NewController creates an authenticated client to the MAAS API, and
@@ -300,7 +301,7 @@ func (c *controller) Devices(args DevicesArgs) ([]Device, error) {
 	return result, nil
 }
 
-// CreateDeviceArgs is a argument struct for passing information into CreateDevice.
+// CreateDeviceArgs is an argument struct for passing information into CreateDevice.
 type CreateDeviceArgs struct {
 	Hostname     string
 	MACAddresses []string
@@ -308,7 +309,7 @@ type CreateDeviceArgs struct {
 	Parent       string
 }
 
-// Devices implements Controller.
+// CreateDevice implements Controller.
 func (c *controller) CreateDevice(args CreateDeviceArgs) (Device, error) {
 	// There must be at least one mac address.
 	if len(args.MACAddresses) == 0 {
@@ -336,6 +337,72 @@ func (c *controller) CreateDevice(args CreateDeviceArgs) (Device, error) {
 	}
 	device.controller = c
 	return device, nil
+}
+
+// CreateMachineArgs is a argument struct for passing information into CreateMachine.
+type CreateMachineArgs struct {
+	//
+	Architecture        string
+	MinHardwareKernel   string
+	SubArchitecture     string
+	MACAddresses        []string
+	Hostname            string
+	Description         string
+	Domain              string
+	PowerType           string
+	PowerTypeParameters map[string]string
+
+	Commission     bool
+	Deployed       bool
+	EnableSSH      bool
+	SkipBMCConfig  bool
+	SkipNetworking bool
+	SkipStorage    bool
+}
+
+// CreateMachine implements Controller.
+func (c *controller) CreateMachine(args CreateMachineArgs) (Machine, error) {
+	// There must be at least one mac address.
+	if len(args.MACAddresses) == 0 {
+		return nil, NewBadRequestError("at least one MAC address must be specified")
+	}
+
+	params := NewURLParams()
+	params.MaybeAddOrDefault("architecture", args.Architecture, "amd64")
+	params.MaybeAdd("min_hwe_kernel", args.MinHardwareKernel)
+	params.MaybeAdd("subarchitecture", args.SubArchitecture)
+	params.MaybeAddMany("mac_addresses", args.MACAddresses)
+	params.MaybeAdd("hostname", args.Hostname)
+	params.MaybeAdd("description", args.Description)
+	params.MaybeAdd("domain", args.Domain)
+	params.MaybeAdd("power_type", args.PowerType)
+	for k, v := range args.PowerTypeParameters {
+		params.MaybeAdd(fmt.Sprintf("power_parameters_%s", k), v)
+	}
+	params.MaybeAddBool("commission", args.Commission)
+	params.MaybeAddBool("deployed", args.Deployed)
+	params.MaybeAddBoolAsInt("enable_ssh", args.EnableSSH)
+	params.MaybeAddBoolAsInt("skip_bmc_config", args.SkipBMCConfig)
+	params.MaybeAddBoolAsInt("skip_networking", args.SkipNetworking)
+	params.MaybeAddBoolAsInt("skip_storage", args.SkipStorage)
+
+	result, err := c.post("machines", "", params.Values)
+	if err != nil {
+		if svrErr, ok := errors.Cause(err).(ServerError); ok {
+			if svrErr.StatusCode == http.StatusBadRequest {
+				return nil, errors.Wrap(err, NewBadRequestError(svrErr.BodyMessage))
+			}
+		}
+		// Translate http errors.
+		return nil, NewUnexpectedError(err)
+	}
+
+	machine, err := readMachine(c.apiVersion, result)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	machine.controller = c
+	return machine, nil
 }
 
 // MachinesArgs is a argument struct for selecting Machines.
@@ -556,7 +623,7 @@ func (a *AllocateMachineArgs) notSubnets() []string {
 }
 
 // ConstraintMatches provides a way for the caller of AllocateMachine to determine
-//.how the allocated machine matched the storage and interfaces constraints specified.
+// .how the allocated machine matched the storage and interfaces constraints specified.
 // The labels that were used in the constraints are the keys in the maps.
 type ConstraintMatches struct {
 	// Interface is a mapping of the constraint label specified to the Interfaces
@@ -624,18 +691,25 @@ func (c *controller) AllocateMachine(args AllocateMachineArgs) (Machine, Constra
 type ReleaseMachinesArgs struct {
 	SystemIDs []string
 	Comment   string
+
+	Erase       *bool
+	SecureErase *bool
+	QuickErase  *bool
 }
 
 // ReleaseMachines implements Controller.
 //
 // Release multiple machines at once. Returns
-//  - BadRequestError if any of the machines cannot be found
-//  - PermissionError if the user does not have permission to release any of the machines
-//  - CannotCompleteError if any of the machines could not be released due to their current state
+//   - BadRequestError if any of the machines cannot be found
+//   - PermissionError if the user does not have permission to release any of the machines
+//   - CannotCompleteError if any of the machines could not be released due to their current state
 func (c *controller) ReleaseMachines(args ReleaseMachinesArgs) error {
 	params := NewURLParams()
 	params.MaybeAddMany("machines", args.SystemIDs)
 	params.MaybeAdd("comment", args.Comment)
+	params.OptionalAddBool("erase", args.Erase)
+	params.OptionalAddBool("secure_erase", args.SecureErase)
+	params.OptionalAddBool("quick_erase", args.QuickErase)
 	_, err := c.post("machines", "release", params.Values)
 	if err != nil {
 		if svrErr, ok := errors.Cause(err).(ServerError); ok {

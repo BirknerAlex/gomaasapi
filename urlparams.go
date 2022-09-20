@@ -25,6 +25,15 @@ func (p *URLParams) MaybeAdd(name, value string) {
 	}
 }
 
+// MaybeAddOrDefault adds the (name, value) pair iff value is not empty otherwise the default will be added.
+func (p *URLParams) MaybeAddOrDefault(name, value string, def string) {
+	if value != "" {
+		p.Values.Add(name, value)
+	} else {
+		p.Values.Add(name, def)
+	}
+}
+
 // MaybeAddInt adds the (name, value) pair iff value is not zero.
 func (p *URLParams) MaybeAddInt(name string, value int) {
 	if value != 0 {
@@ -32,9 +41,23 @@ func (p *URLParams) MaybeAddInt(name string, value int) {
 	}
 }
 
+// MaybeAddBoolAsInt adds the (name, value) pair iff value is true.
+func (p *URLParams) MaybeAddBoolAsInt(name string, value bool) {
+	if value {
+		p.Values.Add(name, fmt.Sprint(1))
+	}
+}
+
 // MaybeAddBool adds the (name, value) pair iff value is true.
 func (p *URLParams) MaybeAddBool(name string, value bool) {
 	if value {
+		p.Values.Add(name, fmt.Sprint(value))
+	}
+}
+
+// OptionalAddBool adds the boolean value (name, value) pair if value a bool is given.
+func (p *URLParams) OptionalAddBool(name string, value *bool) {
+	if value != nil {
 		p.Values.Add(name, fmt.Sprint(value))
 	}
 }

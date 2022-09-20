@@ -1,2 +1,4 @@
 *.sw[nop]
 example/[^.]*
+/.idea/
+/.example/

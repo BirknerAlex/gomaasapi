@@ -13,6 +13,10 @@ clean:
 format:
 	gofmt -w .
 
+# Run all existing tests.
+test:
+	go test ./...
+
 # Invoke gofmt's "simplify" option to streamline the source code.
 simplify:
 	gofmt -w -s .
@@ -23,4 +27,4 @@ examples: $(example_binaries)
 %: %.go
 	go build -o $@ $<
 
-.PHONY: check clean format examples simplify
+.PHONY: check clean format examples simplify test
