@@ -35,7 +35,7 @@ type machine struct {
 	powerState  string
 
 	// NOTE: consider some form of status struct
-	statusName    string
+	statusName    MachineStatus
 	statusMessage string
 
 	bootInterface *interface_
@@ -180,7 +180,7 @@ func (m *machine) Architecture() string {
 }
 
 // StatusName implements Machine.
-func (m *machine) StatusName() string {
+func (m *machine) StatusName() MachineStatus {
 	return m.statusName
 }
 
@@ -262,20 +262,43 @@ func (m *machine) Devices(args DevicesArgs) ([]Device, error) {
 // StartArgs is an argument struct for passing parameters to the Machine.Start
 // method.
 type StartArgs struct {
-	// UserData needs to be Base64 encoded user data for cloud-init.
-	UserData     string
+	// UserData If present, this blob of base64-encoded user-data to
+	// be made available to the machines through the metadata service.
+	UserData string
+	// OperatingSystem If present, this parameter specifies the OS the machine will use.
+	OperatingSystem string
+	// DistroSeries If present, this parameter specifies the OS release the machine will use.
 	DistroSeries string
-	Kernel       string
-	Comment      string
+	// Kernel If present, this parameter specified the kernel to be used on the machine
+	Kernel string
+	// Comment Optional comment for the event log.
+	Comment string
+	// InstallRackD If true, the rack controller will be installed on this machine.
+	InstallRackD bool
+	// InstallKVM If true, KVM will be installed on this machine and added to MAAS.
+	InstallKVM bool
+	// RegisterVMHost If true, the machine will be registered as a LXD VM host in MAAS.
+	RegisterVMHost bool
+	// EphemeralDeploy If true, machine will be deployed ephemerally even if it has disks.
+	EphemeralDeploy bool
+	// EnableHardwareSync If true, machine will be deployed with a small agent periodically pushing
+	// hardware data to detect any change in devices.
+	EnableHardwareSync bool
 }
 
 // Start implements Machine.
 func (m *machine) Start(args StartArgs) error {
 	params := NewURLParams()
 	params.MaybeAdd("user_data", args.UserData)
+	params.MaybeAdd("osystem", args.OperatingSystem)
 	params.MaybeAdd("distro_series", args.DistroSeries)
 	params.MaybeAdd("hwe_kernel", args.Kernel)
 	params.MaybeAdd("comment", args.Comment)
+	params.MaybeAddBool("install_rackd", args.InstallRackD)
+	params.MaybeAddBool("install_kvm", args.InstallKVM)
+	params.MaybeAddBool("register_vmhost", args.RegisterVMHost)
+	params.MaybeAddBool("ephemeral_deploy", args.EphemeralDeploy)
+	params.MaybeAddBool("enable_hw_sync", args.EnableHardwareSync)
 	result, err := m.controller.post(m.resourceURI, "deploy", params.Values)
 	if err != nil {
 		if svrErr, ok := errors.Cause(err).(ServerError); ok {
@@ -688,7 +711,7 @@ func machine_2_0(source map[string]interface{}) (*machine, error) {
 
 		ipAddresses:   convertToStringSlice(valid["ip_addresses"]),
 		powerState:    valid["power_state"].(string),
-		statusName:    valid["status_name"].(string),
+		statusName:    MachineStatus(valid["status_name"].(string)),
 		statusMessage: statusMessage,
 
 		bootInterface:        bootInterface,

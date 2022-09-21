@@ -58,6 +58,9 @@ type Controller interface {
 	// from the user making them available to be allocated again.
 	ReleaseMachines(ReleaseMachinesArgs) error
 
+	// Subnets returns a list of subnets that match the params.
+	Subnets(SubnetsArgs) ([]Subnet, error)
+
 	// Devices returns a list of devices that match the params.
 	Devices(DevicesArgs) ([]Device, error)
 
@@ -233,7 +236,7 @@ type Machine interface {
 	// but need to check for consistent representation if exposed on other
 	// entities.
 
-	StatusName() string
+	StatusName() MachineStatus
 	StatusMessage() string
 
 	// BootInterface returns the interface that was used to boot the Machine.

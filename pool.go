@@ -30,7 +30,7 @@ func (p *pool) Description() string {
 }
 
 func readPools(controllerVersion version.Number, source interface{}) ([]*pool, error) {
-	var deserialisationVersion version.Number
+	var deserializationVersion version.Number
 
 	checker := schema.List(schema.StringMap(schema.Any()))
 	coerced, err := checker.Coerce(source, nil)
@@ -42,16 +42,16 @@ func readPools(controllerVersion version.Number, source interface{}) ([]*pool, e
 	valid := coerced.([]interface{})
 
 	for v := range poolDeserializationFuncs {
-		if v.Compare(deserialisationVersion) > 0 && v.Compare(controllerVersion) <= 0 {
-			deserialisationVersion = v
+		if v.Compare(deserializationVersion) > 0 && v.Compare(controllerVersion) <= 0 {
+			deserializationVersion = v
 		}
 	}
 
-	if deserialisationVersion == version.Zero {
+	if deserializationVersion == version.Zero {
 		return nil, errors.Errorf("no pool read func for version %s", controllerVersion)
 	}
 
-	readFunc := poolDeserializationFuncs[deserialisationVersion]
+	readFunc := poolDeserializationFuncs[deserializationVersion]
 	return readPoolList(valid, readFunc)
 }
 

@@ -178,19 +178,32 @@ func (i *interface_) Delete() error {
 type InterfaceLinkMode string
 
 const (
-	// LinkModeDHCP - Bring the interface up with DHCP on the given subnet. Only
-	// one subnet can be set to DHCP. If the subnet is managed this interface
+	// LinkModeAuto - Assign this interface a static IP address from the provided subnet.
+	// The subnet must be a managed subnet. The IP address will not be assigned until
+	// the node goes to be deployed.
+	LinkModeAuto InterfaceLinkMode = "AUTO"
+
+	// LinkModeDHCP - Bring this interface up with DHCP on the given subnet.
+	// Only one subnet can be set to DHCP. If the subnet is managed this interface
 	// will pull from the dynamic IP range.
 	LinkModeDHCP InterfaceLinkMode = "DHCP"
 
-	// LinkModeStatic - Bring the interface up with a STATIC IP address on the
-	// given subnet. Any number of STATIC links can exist on an interface.
+	// LinkModeStatic - Bring this interface up with a static IP address on the given subnet.
+	// Any number of static links can exist on an interface.
 	LinkModeStatic InterfaceLinkMode = "STATIC"
 
-	// LinkModeLinkUp - Bring the interface up only on the given subnet. No IP
-	// address will be assigned to this interface. The interface cannot have any
-	// current DHCP or STATIC links.
+	// LinkModeLinkUp - Bring this interface up only on the given subnet.
+	// No IP address will be assigned to this interface. The interface cannot have
+	// any current AUTO, DHCP or STATIC links.
 	LinkModeLinkUp InterfaceLinkMode = "LINK_UP"
+)
+
+// MachineStatus represents the status of a machine.
+type MachineStatus string
+
+const (
+	MachineStatusNew           MachineStatus = "New"
+	MachineStatusCommissioning MachineStatus = "Commissioning"
 )
 
 // LinkSubnetArgs is an argument struct for passing parameters to
@@ -209,13 +222,19 @@ type LinkSubnetArgs struct {
 	// default gateway for the machine or device the interface belongs to.
 	// Option can only be used with mode LinkModeStatic.
 	DefaultGateway bool
+	// Force - If True, allows LINK_UP to be set on the interface even if other links already exist.
+	// Also allows the selection of any VLAN, even a VLAN MAAS does not believe the interface to currently be on.
+	// Using this option will cause all other links on the interface to be deleted. (Defaults to False.)
+	Force bool
+	// ExtraStates
+	ExtraStates []string
 }
 
 // Validate ensures that the Mode and Subnet are set, and that the other options
 // are consistent with the Mode.
 func (a *LinkSubnetArgs) Validate() error {
 	switch a.Mode {
-	case LinkModeDHCP, LinkModeLinkUp, LinkModeStatic:
+	case LinkModeDHCP, LinkModeLinkUp, LinkModeStatic, LinkModeAuto:
 	case "":
 		return errors.NotValidf("missing Mode")
 	default:
@@ -242,6 +261,8 @@ func (i *interface_) LinkSubnet(args LinkSubnetArgs) error {
 	params.Values.Add("mode", string(args.Mode))
 	params.Values.Add("subnet", fmt.Sprint(args.Subnet.ID()))
 	params.MaybeAdd("ip_address", args.IPAddress)
+	params.MaybeAddMany("extra_states", args.ExtraStates)
+	params.MaybeAddBool("force", args.Force)
 	params.MaybeAddBool("default_gateway", args.DefaultGateway)
 	source, err := i.controller.post(i.resourceURI, "link_subnet", params.Values)
 	if err != nil {

@@ -59,30 +59,30 @@ func readTagList(sourceList []interface{}, readFunc tagDeserializationFunc) ([]*
 			return nil, NewDeserializationError("unexpected value for tag %d, %T", i, value)
 		}
 
-		machine, err := readFunc(source)
+		tag, err := readFunc(source)
 		if err != nil {
 			return nil, errors.Annotatef(err, "tag %d", i)
 		}
 
-		result = append(result, machine)
+		result = append(result, tag)
 	}
 
 	return result, nil
 }
 
 func getTagDeserializationFunc(controllerVersion version.Number) (tagDeserializationFunc, error) {
-	var deserialisationVersion version.Number
+	var deserializationVersion version.Number
 	for v := range tagDeserializationFuncs {
-		if v.Compare(deserialisationVersion) > 0 && v.Compare(controllerVersion) <= 0 {
-			deserialisationVersion = v
+		if v.Compare(deserializationVersion) > 0 && v.Compare(controllerVersion) <= 0 {
+			deserializationVersion = v
 		}
 	}
 
-	if deserialisationVersion == version.Zero {
+	if deserializationVersion == version.Zero {
 		return nil, NewUnsupportedVersionError("no tag read func for version %s", controllerVersion)
 	}
 
-	return tagDeserializationFuncs[deserialisationVersion], nil
+	return tagDeserializationFuncs[deserializationVersion], nil
 }
 
 type tagDeserializationFunc func(map[string]interface{}) (*tag, error)

@@ -450,6 +450,32 @@ func (c *controller) Machines(args MachinesArgs) ([]Machine, error) {
 	return result, nil
 }
 
+// SubnetsArgs is an argument struct for selecting Subnets.
+// Only subnets that match the specified criteria are returned.
+type SubnetsArgs struct{}
+
+// Subnets implements Controller.
+func (c *controller) Subnets(args SubnetsArgs) ([]Subnet, error) {
+	params := NewURLParams()
+
+	// At the moment the MAAS API doesn't support filtering by owner
+	// data so we do that ourselves below.
+	source, err := c.getQuery("subnets", params.Values)
+	if err != nil {
+		return nil, NewUnexpectedError(err)
+	}
+	subnets, err := readSubnets(c.apiVersion, source)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	var result []Subnet
+	for _, s := range subnets {
+		result = append(result, s)
+	}
+
+	return result, nil
+}
+
 func ownerDataMatches(ownerData, filter map[string]string) bool {
 	for key, value := range filter {
 		if ownerData[key] != value {
