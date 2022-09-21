@@ -312,6 +312,71 @@ type CreateMachineDeviceArgs struct {
 	VLAN          VLAN
 }
 
+// CommissionArgs is an argument struct for passing parameters to the Machine.Commission
+// method.
+type CommissionArgs struct {
+	EnableSSH      bool
+	SkipBMCConfig  bool
+	SkipNetworking bool
+	SkipStorage    bool
+}
+
+// Commission commissions the machine.
+func (m *machine) Commission(args CommissionArgs) error {
+	params := NewURLParams()
+	params.MaybeAdd("system_id", m.SystemID())
+	params.MaybeAddBool("enable_ssh", args.EnableSSH)
+	params.MaybeAddBoolAsInt("skip_bmc_config", args.SkipBMCConfig)
+	params.MaybeAddBoolAsInt("skip_networking", args.SkipNetworking)
+	params.MaybeAddBoolAsInt("skip_storage", args.SkipStorage)
+	result, err := m.controller.post(m.resourceURI, "commission", params.Values)
+	if err != nil {
+		if svrErr, ok := errors.Cause(err).(ServerError); ok {
+			switch svrErr.StatusCode {
+			case http.StatusNotFound, http.StatusConflict:
+				return errors.Wrap(err, NewBadRequestError(svrErr.BodyMessage))
+			case http.StatusForbidden:
+				return errors.Wrap(err, NewPermissionError(svrErr.BodyMessage))
+			case http.StatusServiceUnavailable:
+				return errors.Wrap(err, NewCannotCompleteError(svrErr.BodyMessage))
+			}
+		}
+		return NewUnexpectedError(err)
+	}
+
+	machine, err := readMachine(m.controller.apiVersion, result)
+	if err != nil {
+		return errors.Trace(err)
+	}
+	m.updateFrom(machine)
+	return nil
+}
+
+// SetZoneArgs is an argument struct for passing parameters to the Machine.SetZone
+// method.
+type SetZoneArgs struct {
+	Zone string
+}
+
+// SetZone sets the zone to the machine.
+func (m *machine) SetZone(args SetZoneArgs) error {
+	params := NewURLParams()
+	params.MaybeAdd("nodes", m.SystemID())
+	params.MaybeAdd("zone", args.Zone)
+	_, err := m.controller.post("machines", "set_zone", params.Values)
+	if err != nil {
+		if svrErr, ok := errors.Cause(err).(ServerError); ok {
+			switch svrErr.StatusCode {
+			case http.StatusForbidden:
+				return errors.Wrap(err, NewPermissionError(svrErr.BodyMessage))
+			}
+		}
+		return NewUnexpectedError(err)
+	}
+
+	return nil
+}
+
 // Validate ensures that all required values are non-emtpy.
 func (a *CreateMachineDeviceArgs) Validate() error {
 	if a.InterfaceName == "" {

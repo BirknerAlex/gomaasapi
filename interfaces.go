@@ -266,6 +266,12 @@ type Machine interface {
 	// Start the machine and install the operating system specified in the args.
 	Start(StartArgs) error
 
+	// Commission the machine specified in the args.
+	Commission(args CommissionArgs) error
+
+	// SetZone change the machine zone
+	SetZone(args SetZoneArgs) error
+
 	// CreateDevice creates a new Device with this Machine as the parent.
 	// The device will have one interface that is linked to the specified subnet.
 	CreateDevice(CreateMachineDeviceArgs) (Device, error)
